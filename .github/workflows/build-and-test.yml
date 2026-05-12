@@ -2,9 +2,9 @@ name: Build and Test
 
 on:
   push:
-    branches: [ "main" ]       # adjust if your default branch is different
+    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]       # build PRs targeting main
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -19,7 +19,11 @@ jobs:
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: maven         # automatically caches ~/.m2/repository
+          cache: maven
 
-      - name: Build and run tests
-        run: mvn --batch-mode test
+      - name: Compile main and test code
+        run: mvn --batch-mode compile test-compile
+
+      - name: Run bundled TestRunner
+        run: |
+          java -cp target/classes:target/test-classes com.agentruntime.TestRunner
