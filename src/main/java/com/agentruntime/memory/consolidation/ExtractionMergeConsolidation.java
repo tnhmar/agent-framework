@@ -37,10 +37,7 @@ public class ExtractionMergeConsolidation implements ConsolidationStrategy {
             // Stable, idempotent concept key per episode
             String conceptKey = "fact:" + agentId + ":" + ep.id().value().substring(0, 8);
             semantic.store(conceptKey, ep.summary(),
-                    Map.of("strategy", "extraction-merge",
-                           "agentId",  agentId,
-                           "episodeId", ep.id().value(),
-                           "source",   "episodic"));
+                    Map.<String,Object>of("strategy", "extraction-merge", "agentId", agentId, "episodeId", ep.id().value(), "source", "episodic"));
             written++;
         }
         return written;

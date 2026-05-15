@@ -9,6 +9,8 @@ public class DefaultFederatedRetrievalCoordinator implements FederatedRetrievalC
     public DefaultFederatedRetrievalCoordinator(FederatedMergePolicy mergePolicy) { this.mergePolicy = mergePolicy; }
     @Override
     public FederatedRetrievalResult retrieve(FederatedRetrievalRequest request, ExecutionContext ctx) {
+        if (request.topK() < 1)
+            throw new IllegalArgumentException("topK must be >= 1, got: " + request.topK());
         var start = Instant.now();
         var sourceResults = new ArrayList<FederatedRetrievalResult>();
         for (var source : request.sources()) {

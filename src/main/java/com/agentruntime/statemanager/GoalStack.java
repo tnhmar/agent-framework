@@ -24,6 +24,8 @@ public class GoalStack {
     /** Push a new goal onto the stack (appended at the end — newest = deepest). */
     public void push(GoalEntry goal) {
         Objects.requireNonNull(goal);
+        if (stack.stream().anyMatch(g -> g.goalId().equals(goal.goalId())))
+            throw new IllegalArgumentException("Duplicate goalId: '" + goal.goalId() + "' is already in the stack");
         stack.add(goal);
     }
 

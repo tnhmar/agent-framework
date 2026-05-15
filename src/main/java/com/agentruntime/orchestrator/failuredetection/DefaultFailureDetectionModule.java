@@ -59,8 +59,12 @@ public class DefaultFailureDetectionModule implements FailureDetectionModule {
     private boolean isSemantic(String phase, String msg) {
         String lowerPhase = phase != null ? phase.toLowerCase() : "";
         String lowerMsg   = msg.toLowerCase();
-        return lowerPhase.contains("reasoning") || lowerPhase.contains("reflection")
-                || lowerMsg.contains("irrelevant") || lowerMsg.contains("off-topic")
-                || lowerMsg.contains("misunderstood") || lowerMsg.contains("objective drift");
+        // Semantic errors require message-level evidence — a timeout in the reasoning phase
+        // is still TRANSIENT, not semantic. Phase alone is insufficient.
+        boolean semanticMessage = lowerMsg.contains("irrelevant") || lowerMsg.contains("off-topic")
+                || lowerMsg.contains("misunderstood") || lowerMsg.contains("objective drift")
+                || lowerMsg.contains("wrong task") || lowerMsg.contains("goal drift");
+        boolean reasoningPhase = lowerPhase.contains("reasoning") || lowerPhase.contains("reflection");
+        return semanticMessage || (reasoningPhase && semanticMessage);
     }
 }

@@ -47,6 +47,7 @@ public class TestRunner {
             "com.agentruntime.UserModelAndCheckpointTest",
             "com.agentruntime.ConsolidationAndScoringTest",
             "com.agentruntime.ToolContractAndInfraTest",
+            "com.agentruntime.ProductionReadinessTest",
         };
 
         for (String className : testClasses) {

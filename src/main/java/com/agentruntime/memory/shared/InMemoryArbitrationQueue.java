@@ -73,6 +73,9 @@ public class InMemoryArbitrationQueue implements HumanArbitrationQueue {
                            "canonicalValue", resolution.canonicalValue().value(),
                            "policyApplied",  resolution.policyApplied().name()),
                     Instant.now(), true));
+            // Drain the resolved request from the pending queue
+            queue.removeIf(req -> req.conflicts().stream()
+                    .anyMatch(cr -> cr.entityKey().equals(key)));
             return resolution;
         });
     }

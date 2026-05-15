@@ -81,8 +81,11 @@ public class DefaultActionModule implements ActionModule {
                     reasoning.selectedActions(),
                     "Pre-action checkpoint before irreversible action: " + actionName);
             checkpointStore.save(cp);
-        } catch (Exception ignored) {
-            // Never block action dispatch on checkpoint failure
+        } catch (Exception e) {
+            // Never block action dispatch on checkpoint failure — but log it
+            java.util.logging.Logger.getLogger(DefaultActionModule.class.getName())
+                    .log(java.util.logging.Level.WARNING,
+                         "Pre-action checkpoint failed for action: " + actionName, e);
         }
     }
 }

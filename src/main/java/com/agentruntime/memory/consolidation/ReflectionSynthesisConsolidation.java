@@ -42,13 +42,9 @@ public class ReflectionSynthesisConsolidation implements ConsolidationStrategy {
         String patternSummary = synthesise(episodes);
         if (patternSummary.isBlank()) return 0;
 
-        String insightKey = "reflection:" + agentId + ":pattern-" + System.currentTimeMillis();
+        String insightKey = "reflection:" + agentId + ":pattern-" + java.util.UUID.randomUUID();
         semantic.store(insightKey, patternSummary,
-                Map.of("strategy",   "reflection-synthesis",
-                       "agentId",    agentId,
-                       "source",     "reflection",
-                       "confidence", String.valueOf(REFLECTION_CONFIDENCE),
-                       "episodeCount", String.valueOf(episodes.size())));
+                Map.<String,Object>of("strategy", "reflection-synthesis", "agentId", agentId, "source", "reflection", "confidence", String.valueOf(REFLECTION_CONFIDENCE), "episodeCount", String.valueOf(episodes.size())));
         return 1;
     }
 

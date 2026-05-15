@@ -82,9 +82,16 @@ public class InMemorySharedMemoryStore implements SharedMemoryStore {
 
     @Override
     public List<VersionedRecord> readBatch(SharedMemoryQuery query, AgentIdentity reader) {
+        // P0-02: SecurityException from individual read() must not abort the entire batch.
         return query.recordIds().stream()
-                .map(id -> read(id, reader))
-                .filter(Objects::nonNull)
+                .flatMap(id -> {
+                    try {
+                        VersionedRecord r = read(id, reader);
+                        return r != null ? java.util.stream.Stream.of(r) : java.util.stream.Stream.empty();
+                    } catch (SecurityException e) {
+                        return java.util.stream.Stream.empty();
+                    }
+                })
                 .toList();
     }
 

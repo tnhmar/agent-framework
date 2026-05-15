@@ -42,15 +42,22 @@ public class InMemoryHitlGateway implements HitlGateway {
      * Resolve a pending request.
      * Atomically removes it from pending and stores the response.
      */
+    /**
+     * Atomically moves a request from pending to resolved.
+     * P1-02: uses a single synchronized block so that concurrent isResolved()/poll()
+     * callers never observe a neither-map state.
+     */
     public void resolve(String requestId, String answer, String responderId) {
-        Objects.requireNonNull(requestId, "requestId must not be null");
-        Objects.requireNonNull(answer,    "answer must not be null");
+        Objects.requireNonNull(requestId,   "requestId must not be null");
+        Objects.requireNonNull(answer,      "answer must not be null");
         Objects.requireNonNull(responderId, "responderId must not be null");
 
         HitlResponse response = new HitlResponse(
                 requestId, answer, responderId, Map.of(), Instant.now());
-        pending.remove(requestId);
-        resolved.put(requestId, response);
+        synchronized (this) {
+            pending.remove(requestId);
+            resolved.put(requestId, response);
+        }
     }
 
     /** Returns the count of requests not yet resolved. */

@@ -60,8 +60,8 @@ class SessionLifecycleTest {
     @Test
     void sessionClose_providesTaskStateCheckpoint() {
         var report = manager.onSessionClose("session-4", "agent-4");
-        assertNotNull(report.taskStateCheckpoint(), "Step 2: task state checkpoint must be produced");
-        assertTrue(report.taskStateCheckpoint().contains("session-4"), "Checkpoint must reference session ID");
+        assertNotNull(report.taskStateCheckpointRef(), "Step 2: task state checkpoint must be produced");
+        assertTrue(report.taskStateCheckpointRef().contains("session-4"), "Checkpoint must reference session ID");
     }
 
     @Test

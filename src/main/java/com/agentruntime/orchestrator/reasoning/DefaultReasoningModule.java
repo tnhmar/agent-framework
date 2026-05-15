@@ -51,6 +51,10 @@ public class DefaultReasoningModule implements ReasoningModule {
             ModelOutput output = modelClient.generate(prompt, reqCtx);
             return parseReasoningResult(output);
         } catch (ModelClientException e) {
+            // P1-07: log degradation so it appears in observability
+            java.util.logging.Logger.getLogger(DefaultReasoningModule.class.getName())
+                    .log(java.util.logging.Level.WARNING,
+                         "ModelClient degradation [retryable=" + e.retryable() + "]: " + e.getMessage());
             return new ReasoningResult("Fallback after model error", List.of("retry_or_escalate"),
                     "ModelClientException: " + e.getMessage(), 0.0, !e.retryable());
         }

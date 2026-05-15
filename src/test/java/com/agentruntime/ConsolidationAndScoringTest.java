@@ -248,9 +248,9 @@ class ConsolidationAndScoringTest {
         assertTrue(a.requiresEscalation());
     }
 
-    @Test void failureDetection_semantic_inReasoningPhase() {
+    @Test void failureDetection_semantic_withSemanticMessage() {
         DefaultFailureDetectionModule module = new DefaultFailureDetectionModule();
-        RuntimeException e = new RuntimeException("Unexpected error");
+        RuntimeException e = new RuntimeException("Agent is off-topic and misunderstood the task");
         FailureAssessment a = module.assess(e, "reasoning", ctx());
         assertEquals(FailureCategory.SEMANTIC, a.category());
         assertTrue(a.requiresEscalation());
@@ -265,6 +265,7 @@ class ConsolidationAndScoringTest {
 
     @Test void failureDetection_deterministic_forUnclassified() {
         DefaultFailureDetectionModule module = new DefaultFailureDetectionModule();
+        // "schema mismatch" in "action" phase — no TRANSIENT/POLICY/SEMANTIC markers → DETERMINISTIC
         RuntimeException e = new RuntimeException("Unknown schema mismatch");
         FailureAssessment a = module.assess(e, "action", ctx());
         assertEquals(FailureCategory.DETERMINISTIC, a.category());

@@ -8,6 +8,7 @@ import com.agentruntime.orchestrator.delegation.DelegationResult;
 import com.agentruntime.orchestrator.failuredetection.*;
 import com.agentruntime.orchestrator.perception.*;
 import com.agentruntime.orchestrator.prompting.*;
+import com.agentruntime.orchestrator.failuredetection.FailureCategory;
 import com.agentruntime.orchestrator.reasoning.*;
 import com.agentruntime.orchestrator.reflection.*;
 import com.agentruntime.orchestrator.termination.*;
@@ -36,6 +37,9 @@ public class DefaultAgentOrchestrator implements AgentOrchestrator {
     private final int                   maxDelegationDepth;
 
     // Cycle detection: tracks active agent IDs per root execution
+    private static final int MAX_TRANSIENT_RETRIES = 3;
+    private static final long RETRY_BASE_MS       = 200L;
+
     private final Map<String, Set<String>> activeDelegationChains = new ConcurrentHashMap<>();
 
     public DefaultAgentOrchestrator(
@@ -141,6 +145,41 @@ public class DefaultAgentOrchestrator implements AgentOrchestrator {
         stateManager.updateStatus(ctx.executionId(), AgentStatus.FAILED);
         return new ExecutionResult(ctx.executionId(), AgentStatus.FAILED,
                 Map.of(), "Max iterations exhausted", task.maxIterations());
+    }
+
+    /**
+     * P2-01: Retry reasoning on TRANSIENT failures with exponential backoff.
+     * DETERMINISTIC/POLICY/SEMANTIC failures are not retried.
+     */
+    private ReasoningResult reasonWithRetry(
+            com.agentruntime.orchestrator.perception.PerceptionResult perception,
+            AgentState state, ExecutionContext ctx) {
+
+        ReasoningResult result = null;
+        Exception lastEx = null;
+        for (int attempt = 0; attempt <= MAX_TRANSIENT_RETRIES; attempt++) {
+            try {
+                result = reasoningModule.reason(perception, state, ctx);
+                // If reasoning returned a fallback with 0 confidence, treat as failure
+                if (result.confidence() > 0) return result;
+            } catch (Exception e) {
+                lastEx = e;
+                var assessment = failureDetectionModule.assess(e, "reasoning", ctx);
+                if (assessment.category() != FailureCategory.TRANSIENT || attempt == MAX_TRANSIENT_RETRIES) {
+                    // Non-retryable or max retries exhausted
+                    return new ReasoningResult("Reasoning failed", List.of("retry_or_escalate"),
+                            e.getMessage(), 0.0, assessment.requiresEscalation());
+                }
+                long delayMs = RETRY_BASE_MS * (1L << attempt); // 200 → 400 → 800
+                try { Thread.sleep(delayMs); } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return new ReasoningResult("Reasoning interrupted", List.of("retry_or_escalate"),
+                            "Interrupted during retry backoff", 0.0, true);
+                }
+            }
+        }
+        return result != null ? result : new ReasoningResult("Reasoning failed after retries",
+                List.of("retry_or_escalate"), "All retries exhausted", 0.0, true);
     }
 
     /**

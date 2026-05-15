@@ -4,6 +4,7 @@ import com.agentruntime.core.enums.AgentStatus;
 import com.agentruntime.core.valueobjects.AgentIdentity;
 import com.agentruntime.observability.AuditEvent;
 import com.agentruntime.observability.ObservabilityBus;
+import com.agentruntime.observability.TelemetryRecord;
 
 import java.time.Instant;
 import java.util.*;
@@ -25,7 +26,8 @@ public class StateManager {
             AgentIdentity agentIdentity,
             AgentStatus status,
             int         iteration,
-            Instant     lastUpdated) {}
+            Instant     lastUpdated,
+            Instant     phaseStarted) {}
 
     private final ConcurrentHashMap<String, AgentStateRecord> states = new ConcurrentHashMap<>();
     private final ObservabilityBus bus;
@@ -41,16 +43,28 @@ public class StateManager {
         Objects.requireNonNull(executionId, "executionId must not be null");
         Objects.requireNonNull(identity,    "identity must not be null");
         states.put(executionId, new AgentStateRecord(
-                executionId, identity, AgentStatus.IDLE, 0, Instant.now()));
+                executionId, identity, AgentStatus.IDLE, 0, Instant.now(), Instant.now()));
     }
 
     public void updateStatus(String executionId, AgentStatus newStatus) {
         states.compute(executionId, (id, existing) -> {
             if (existing == null) return null;
             AgentStatus prev = existing.status();
+            Instant now = Instant.now();
+            // P2-03: emit latency telemetry for the phase that just ended
+            if (existing.phaseStarted() != null) {
+                java.time.Duration phaseDuration = java.time.Duration.between(existing.phaseStarted(), now);
+                bus.record(new TelemetryRecord(
+                        executionId, executionId + ":" + prev.name(),
+                        prev.name(), phaseDuration, true,
+                        java.util.Map.of("agentId", existing.agentIdentity() != null
+                                ? existing.agentIdentity().agentId() : "unknown",
+                                "iteration", existing.iteration()),
+                        existing.phaseStarted()));
+            }
             AgentStateRecord updated = new AgentStateRecord(
                     executionId, existing.agentIdentity(), newStatus,
-                    existing.iteration(), Instant.now());
+                    existing.iteration(), now, now);
             // G-12: emit phase transition event
             emitPhaseTransition(existing.agentIdentity(), executionId, prev, newStatus,
                     existing.iteration());
@@ -60,7 +74,7 @@ public class StateManager {
 
     public void incrementIteration(String executionId) {
         states.computeIfPresent(executionId, (id, s) -> new AgentStateRecord(
-                id, s.agentIdentity(), s.status(), s.iteration() + 1, Instant.now()));
+                id, s.agentIdentity(), s.status(), s.iteration() + 1, Instant.now(), s.phaseStarted()));
     }
 
     public Optional<AgentStateRecord> get(String executionId) {

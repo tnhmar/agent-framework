@@ -49,8 +49,7 @@ public class RollingWindowConsolidation implements ConsolidationStrategy {
 
         String rollingKey  = "rolling-summary:" + agentId;
         String rollingText = buffer.toString().trim();
-        semantic.store(rollingKey, rollingText,
-                Map.of("strategy", "rolling-summary", "agentId", agentId));
+        semantic.store(rollingKey, rollingText, Map.<String,Object>of("strategy", "rolling-summary", "agentId", agentId));
         return 1;
     }
 }

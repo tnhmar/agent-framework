@@ -39,6 +39,7 @@ public class EpisodicStore {
 
     public List<Episode> recallByAgent(String agentId) {
         Objects.requireNonNull(agentId);
+        if (agentId.isBlank()) throw new IllegalArgumentException("agentId must not be blank");
         return episodes.stream().filter(e -> e.agentId().equals(agentId)).toList();
     }
 
