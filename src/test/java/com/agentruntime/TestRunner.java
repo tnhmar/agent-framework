@@ -48,6 +48,7 @@ public class TestRunner {
             "com.agentruntime.ConsolidationAndScoringTest",
             "com.agentruntime.ToolContractAndInfraTest",
             "com.agentruntime.ProductionReadinessTest",
+            "com.agentruntime.ProductionGradeFixesTest",
         };
 
         for (String className : testClasses) {

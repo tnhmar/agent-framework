@@ -122,23 +122,6 @@ public class SessionLifecycleManager {
                 step1Error, step2Error, step3Error, step4Error);
     }
 
-    /**
-     * Vol.1 Ch.13 §"Confidence-Gated Injection": injects UserModel facts into working memory
-     * at session start, filtered to confidence >= minConfidence.
-     * P3 gap fix: UserModel wired into session start.
-     */
-    public void onSessionStart(String sessionId,
-            com.agentruntime.memory.usermodel.UserModel userModel,
-            com.agentruntime.memory.working.WorkingMemoryStore workingMemory,
-            double minConfidence) {
-        Objects.requireNonNull(sessionId);
-        if (userModel == null) return;
-        userModel.all().stream()
-                .filter(f -> f.confidence().value >= minConfidence)
-                .forEach(f -> workingMemory.put(
-                        "userModel:" + f.category() + ":" + f.key(), f.value()));
-    }
-
     public record SessionCloseReport(
             String  sessionId,
             String  agentId,

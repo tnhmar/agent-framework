@@ -1,22 +1,8 @@
 package com.agentruntime.orchestrator;
 
-import com.agentruntime.core.valueobjects.ExecutionContext;
-import com.agentruntime.orchestrator.delegation.DelegationContract;
-import com.agentruntime.orchestrator.delegation.DelegationResult;
-
 /**
- * V-21 fix: delegate() added per Vol1 Ch.7 §"Delegation to Subagents".
+ * Full agent orchestrator — composes all three segregated capability interfaces.
+ * V-ISP-01: Clients that need only a subset depend on AgentRunner, AgentLifecycle,
+ * or AgentDelegate directly. This interface is for consumers needing all capabilities.
  */
-public interface AgentOrchestrator {
-    ExecutionResult run(AgentTask task, ExecutionContext ctx);
-    void suspend(String executionId);
-    void resume(String executionId);
-    void terminate(String executionId, String reason);
-
-    /**
-     * Validates the delegation contract, enforces the configured depth limit,
-     * and performs cycle detection before executing the delegated task.
-     * Vol1 Ch.7 §"Delegation to Subagents".
-     */
-    DelegationResult delegate(DelegationContract contract, ExecutionContext ctx);
-}
+public interface AgentOrchestrator extends AgentRunner, AgentDelegate, AgentLifecycle {}

@@ -3,25 +3,34 @@ package com.agentruntime.orchestrator.action.validation;
 import com.agentruntime.core.valueobjects.ExecutionContext;
 import com.agentruntime.core.valueobjects.ValidationResult;
 import com.agentruntime.orchestrator.reasoning.ReasoningResult;
-import java.util.Set;
+
+import java.util.Objects;
 
 /**
- * Layer 4: Safety guard — absolute veto over actions that are unconditionally unsafe.
- * Vol1 Ch.7 §"Action Validation", layer 4.
- * This validator runs last and cannot be bypassed by any upstream validator passing.
+ * Layer 4: Safety guard — absolute veto over unconditionally unsafe actions.
+ * Vol.1 Ch.7 §"Action Validation", layer 4.
+ *
+ * V-OCP-01 FIX: Blocked action list is now externally injectable via SafetyPolicy.
+ * The set is thread-safe and can be updated at runtime (e.g. from a config service).
+ * defaultPipeline() still works unchanged via SafetyPolicy.defaults().
  */
 public class SafetyValidator implements ActionValidator {
 
-    private static final Set<String> HARD_BLOCKED_ACTIONS = Set.of(
-        "purge_all", "admin_delete", "self_replicate", "modify_own_code"
-    );
+    private final SafetyPolicy policy;
+
+    public SafetyValidator(SafetyPolicy policy) {
+        this.policy = Objects.requireNonNull(policy, "policy must not be null");
+    }
+
+    /** Convenience constructor — uses the default blocked set. */
+    public SafetyValidator() { this(SafetyPolicy.defaults()); }
 
     @Override
     public ValidationResult validate(ReasoningResult reasoning, ExecutionContext ctx) {
         for (String action : reasoning.selectedActions()) {
-            if (HARD_BLOCKED_ACTIONS.contains(action.toLowerCase())) {
+            if (policy.isBlocked(action)) {
                 return ValidationResult.rejected(name(),
-                    "Safety veto: action '" + action + "' is unconditionally blocked");
+                        "Safety veto: action '" + action + "' is unconditionally blocked");
             }
         }
         return ValidationResult.passed(name());
@@ -29,4 +38,6 @@ public class SafetyValidator implements ActionValidator {
 
     @Override
     public String name() { return "SafetyValidator"; }
+
+    public SafetyPolicy policy() { return policy; }
 }

@@ -1,6 +1,7 @@
 package com.agentruntime.memory.shared;
 
 import com.agentruntime.core.enums.ConsistencyModel;
+import com.agentruntime.memory.shared.RolePolicy;
 import com.agentruntime.core.valueobjects.*;
 import com.agentruntime.observability.AuditEvent;
 import com.agentruntime.observability.ObservabilityBus;
@@ -16,11 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class InMemorySharedMemoryStore implements SharedMemoryStore {
 
-    private static final Set<String> WRITE_ROLES =
-            Set.of("orchestrator", "specialist", "coordinator", "admin", "compliance");
-    private static final Set<String> READ_ROLES =
-            Set.of("orchestrator", "specialist", "coordinator", "observer",
-                   "admin", "compliance", "agent");
+    private final RolePolicy rolePolicy;
 
     private final Map<String, List<VersionedRecord>> versionHistory = new ConcurrentHashMap<>();
     private final Map<String, ConsistencyModel>      namespaceConsistency;
@@ -29,32 +26,40 @@ public class InMemorySharedMemoryStore implements SharedMemoryStore {
 
     public InMemorySharedMemoryStore(Map<String, ConsistencyModel> namespaceConsistency,
                                      ConsistencyModel defaultConsistency,
-                                     ObservabilityBus observabilityBus) {
+                                     ObservabilityBus observabilityBus,
+                                     RolePolicy rolePolicy) {
         this.namespaceConsistency = new ConcurrentHashMap<>(namespaceConsistency);
         this.defaultConsistency   = defaultConsistency;
         this.observabilityBus     = observabilityBus;
+        this.rolePolicy           = Objects.requireNonNull(rolePolicy, "rolePolicy must not be null");
+    }
+
+    public InMemorySharedMemoryStore(Map<String, ConsistencyModel> namespaceConsistency,
+                                     ConsistencyModel defaultConsistency,
+                                     ObservabilityBus observabilityBus) {
+        this(namespaceConsistency, defaultConsistency, observabilityBus, RolePolicy.defaults());
     }
 
     public InMemorySharedMemoryStore() {
-        this(Map.of(), ConsistencyModel.EVENTUAL, new ObservabilityBus());
+        this(Map.of(), ConsistencyModel.EVENTUAL, new ObservabilityBus(), RolePolicy.defaults());
     }
 
     @Override
-    public VersionedRecord read(String recordId, AgentIdentity reader) {
-        if (!READ_ROLES.contains(reader.role()))
+    public java.util.Optional<VersionedRecord> read(String recordId, AgentIdentity reader) {
+        if (!rolePolicy.canRead(reader.role()))
             throw new SecurityException("Role '" + reader.role() + "' not in READ_ROLES");
         var history = versionHistory.get(recordId);
-        if (history == null || history.isEmpty()) return null;
+        if (history == null || history.isEmpty()) return java.util.Optional.empty();
         var record = history.get(history.size() - 1);
         if (!hasTagAccess(record, reader))
             throw new SecurityException("Agent " + reader.agentId() + " lacks tag access to " + recordId);
-        return record;
+        return java.util.Optional.of(record);
     }
 
     @Override
     public synchronized WriteResult writeWithVersionCheck(String recordId,
             Map<String, Object> content, int expectedVersion, AgentIdentity writer) {
-        if (!WRITE_ROLES.contains(writer.role()))
+        if (!rolePolicy.canWrite(writer.role()))
             throw new SecurityException("Role '" + writer.role() + "' not in WRITE_ROLES");
 
         ConsistencyModel model = resolveConsistencyModel(recordId);
@@ -86,8 +91,7 @@ public class InMemorySharedMemoryStore implements SharedMemoryStore {
         return query.recordIds().stream()
                 .flatMap(id -> {
                     try {
-                        VersionedRecord r = read(id, reader);
-                        return r != null ? java.util.stream.Stream.of(r) : java.util.stream.Stream.empty();
+                        return read(id, reader).stream();
                     } catch (SecurityException e) {
                         return java.util.stream.Stream.empty();
                     }
@@ -104,7 +108,7 @@ public class InMemorySharedMemoryStore implements SharedMemoryStore {
 
     @Override
     public synchronized boolean rollback(String recordId, int targetVersion, AgentIdentity requester) {
-        if (!WRITE_ROLES.contains(requester.role()))
+        if (!rolePolicy.canWrite(requester.role()))
             throw new SecurityException("Role '" + requester.role() + "' cannot rollback");
         var target = getVersion(recordId, targetVersion);
         if (target.isEmpty()) return false;

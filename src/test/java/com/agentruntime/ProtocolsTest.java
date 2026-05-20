@@ -37,6 +37,9 @@ class ProtocolsTest {
     void mcp_toolsCallSucceedsAfterInit() {
         var client = new McpClient("client-3");
         client.initialize(Map.of());
+        // Register a handler — required since S-03 fix (no more silent success)
+        client.registerHandler("retrieve_context",
+                (name, args) -> Map.of("result", "context for: " + args.get("query")));
         var response = client.toolsCall("retrieve_context", Map.of("query", "test"));
         assertTrue(response.isSuccess());
         assertNull(response.error());
@@ -137,8 +140,8 @@ class ProtocolsTest {
         var identity = AnpIdentity.of("did:example:publisher");
         var publisher = new AnpPublisher(identity);
         var received = new ArrayList<AnpEnvelope>();
-        publisher.subscribe("compliance.events", received::add);
-        publisher.publish("compliance.events", Map.of("event", "exposure_computed"), "did:example:receiver");
+        publisher.subscribe("compliance.events", msg -> received.add(msg));
+        assertDoesNotThrow(() -> publisher.publish("compliance.events", Map.of("event", "exposure_computed")));
         assertEquals(1, received.size());
         assertEquals("compliance.events", received.get(0).networkTopic());
         assertEquals(identity.did(), received.get(0).sourceNode());
@@ -150,9 +153,9 @@ class ProtocolsTest {
         var publisher = new AnpPublisher(identity);
         var topicA = new ArrayList<AnpEnvelope>();
         var topicB = new ArrayList<AnpEnvelope>();
-        publisher.subscribe("topic.a", topicA::add);
-        publisher.subscribe("topic.b", topicB::add);
-        publisher.publish("topic.a", Map.of("data", "forA"), "target");
+        publisher.subscribe("topic.a", msg -> topicA.add(msg));
+        publisher.subscribe("topic.b", msg -> topicB.add(msg));
+        assertDoesNotThrow(() -> publisher.publish("topic.a", Map.of("data", "forA")));
         assertEquals(1, topicA.size());
         assertEquals(0, topicB.size());
     }
@@ -162,9 +165,9 @@ class ProtocolsTest {
         var pub = new AnpPublisher(AnpIdentity.of("did:example:p"));
         var sub1 = new ArrayList<AnpEnvelope>();
         var sub2 = new ArrayList<AnpEnvelope>();
-        pub.subscribe("shared.topic", sub1::add);
-        pub.subscribe("shared.topic", sub2::add);
-        pub.publish("shared.topic", Map.of(), "target");
+        pub.subscribe("shared.topic", msg -> sub1.add(msg));
+        pub.subscribe("shared.topic", msg -> sub2.add(msg));
+        assertDoesNotThrow(() -> pub.publish("shared.topic", Map.of()));
         assertEquals(1, sub1.size());
         assertEquals(1, sub2.size());
     }

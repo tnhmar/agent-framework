@@ -536,7 +536,7 @@ class ProductionReadinessTest {
                 "dark", ConfidenceLevel.SPECULATIVE, "agent_inferred"));
 
         // Inject at INFERRED threshold → STATED and VERIFIED pass, SPECULATIVE does not
-        mgr.onSessionStart("session-42", model, wm, ConfidenceLevel.INFERRED.value);
+        new com.agentruntime.memory.usermodel.UserModelInjector().inject(model, wm, ConfidenceLevel.INFERRED.value);
 
         assertTrue(wm.get("userModel:preference:language").isPresent(), "STATED fact must be injected");
         assertTrue(wm.get("userModel:preference:ide").isPresent(),      "VERIFIED fact must be injected");

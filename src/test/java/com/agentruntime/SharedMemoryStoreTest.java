@@ -110,8 +110,8 @@ class SharedMemoryStoreTest {
         store.writeWithVersionCheck("rec7", content("k","v3"), 2, writer);
         assertTrue(store.rollback("rec7", 1, writer));
         var current = store.read("rec7", reader);
-        assertNotNull(current);
-        assertEquals("v1", current.content().get("k"));
+        assertTrue(current.isPresent());
+        assertEquals("v1", current.get().content().get("k"));
     }
 
     @Test void rollback_emitsAuditEvent() {

@@ -228,20 +228,34 @@ class InfrastructureTest {
     void federatedRetrieval_returnsMergedResults() {
         CosineSimilarity cosine = new CosineSimilarity();
         TrustAwareFederatedMergePolicy policy = new TrustAwareFederatedMergePolicy(cosine);
+        com.agentruntime.tooling.rag.MemoryStoreRegistry registry =
+                new com.agentruntime.tooling.rag.MemoryStoreRegistry();
+
+        // Register real memory stores (S-01 fix: no simulated data)
+        com.agentruntime.memory.semantic.SemanticStore semStore =
+                new com.agentruntime.memory.semantic.SemanticStore();
+        semStore.store("orchestration-patterns",
+                "ReAct (Reason+Act) and event-driven orchestration are the dominant agent patterns.",
+                Map.<String,Object>of("source", "knowledge-base"));
+        registry.registerSemantic("semantic", semStore);
+
+        com.agentruntime.memory.episodic.EpisodicStore epiStore =
+                new com.agentruntime.memory.episodic.EpisodicStore();
+        registry.registerEpisodic("episodic", epiStore);
+
         DefaultFederatedRetrievalCoordinator coordinator =
-                new DefaultFederatedRetrievalCoordinator(policy);
+                new DefaultFederatedRetrievalCoordinator(policy, registry);
 
         SourceDescriptor src1 = new SourceDescriptor("semantic", "memory", SourceTrustLabel.VERIFIED, "Semantic Memory");
         SourceDescriptor src2 = new SourceDescriptor("episodic", "memory", SourceTrustLabel.TRUSTED_TOOL, "Episodic Memory");
 
         FederatedRetrievalRequest request = new FederatedRetrievalRequest(
-                "What are agent orchestration patterns?", List.of(src1, src2), 3, false);
-
+                "orchestration", List.of(src1, src2), 3, false);
         ExecutionContext ctx = ExecutionContext.of(AgentIdentity.of("rag-agent", "orchestrator"));
         FederatedRetrievalResult result = coordinator.retrieve(request, ctx);
 
         assertNotNull(result);
-        assertFalse(result.hits().isEmpty());
+        assertFalse(result.hits().isEmpty(), "Semantic store has relevant data; hits must not be empty");
         assertEquals(SourceTrustLabel.VERIFIED, result.trustLabel());
     }
 
@@ -249,36 +263,57 @@ class InfrastructureTest {
     void federatedRetrieval_singleSourceReturnsHits() {
         CosineSimilarity cosine = new CosineSimilarity();
         TrustAwareFederatedMergePolicy policy = new TrustAwareFederatedMergePolicy(cosine);
-        DefaultFederatedRetrievalCoordinator coordinator =
-                new DefaultFederatedRetrievalCoordinator(policy);
+        com.agentruntime.tooling.rag.MemoryStoreRegistry registry =
+                new com.agentruntime.tooling.rag.MemoryStoreRegistry();
+        com.agentruntime.memory.semantic.SemanticStore kbStore =
+                new com.agentruntime.memory.semantic.SemanticStore();
+        kbStore.store("agent-patterns",
+                "Agent patterns include ReAct, event-driven, and hierarchical delegation.",
+                Map.<String,Object>of());
+        registry.registerSemantic("kb", kbStore);
 
+        DefaultFederatedRetrievalCoordinator coordinator =
+                new DefaultFederatedRetrievalCoordinator(policy, registry);
         SourceDescriptor src = new SourceDescriptor("kb", "memory", SourceTrustLabel.VERIFIED, "Knowledge Base");
         FederatedRetrievalRequest request = new FederatedRetrievalRequest(
-                "agent patterns", List.of(src), 5, false);
+                "agent", List.of(src), 5, false);
         ExecutionContext ctx = ExecutionContext.of(AgentIdentity.of("a", "orchestrator"));
         FederatedRetrievalResult result = coordinator.retrieve(request, ctx);
 
         assertNotNull(result);
-        assertFalse(result.hits().isEmpty());
+        assertFalse(result.hits().isEmpty(), "Semantic store has data; hits must not be empty");
     }
 
     @Test
     void federatedRetrieval_topKLimitsResults() {
         CosineSimilarity cosine = new CosineSimilarity();
         TrustAwareFederatedMergePolicy policy = new TrustAwareFederatedMergePolicy(cosine);
-        DefaultFederatedRetrievalCoordinator coordinator =
-                new DefaultFederatedRetrievalCoordinator(policy);
+        com.agentruntime.tooling.rag.MemoryStoreRegistry registry =
+                new com.agentruntime.tooling.rag.MemoryStoreRegistry();
 
-        // 3 sources, each returns 3 hits → 9 total, topK=5
+        // Register 3 semantic stores with multiple entries each
+        for (String id : List.of("s1", "s2", "s3")) {
+            com.agentruntime.memory.semantic.SemanticStore s =
+                    new com.agentruntime.memory.semantic.SemanticStore();
+            for (int i = 0; i < 3; i++) {
+                s.store(id + "-concept-" + i, "agent pattern data " + id + " " + i,
+                        Map.<String,Object>of());
+            }
+            registry.registerSemantic(id, s);
+        }
+
+        DefaultFederatedRetrievalCoordinator coordinator =
+                new DefaultFederatedRetrievalCoordinator(policy, registry);
+
         List<SourceDescriptor> sources = List.of(
-            new SourceDescriptor("s1", "m", SourceTrustLabel.VERIFIED, "S1"),
-            new SourceDescriptor("s2", "m", SourceTrustLabel.TRUSTED_TOOL, "S2"),
+            new SourceDescriptor("s1", "m", SourceTrustLabel.VERIFIED,       "S1"),
+            new SourceDescriptor("s2", "m", SourceTrustLabel.TRUSTED_TOOL,   "S2"),
             new SourceDescriptor("s3", "m", SourceTrustLabel.AGENT_INFERRED, "S3")
         );
-        FederatedRetrievalRequest request = new FederatedRetrievalRequest("query", sources, 5, false);
+        FederatedRetrievalRequest request = new FederatedRetrievalRequest("agent", sources, 5, false);
         ExecutionContext ctx = ExecutionContext.of(AgentIdentity.of("a", "orchestrator"));
         FederatedRetrievalResult result = coordinator.retrieve(request, ctx);
 
-        assertTrue(result.hits().size() <= 10, "Should respect topK cap");
+        assertTrue(result.hits().size() <= 5, "topK=5 must cap results");
     }
 }

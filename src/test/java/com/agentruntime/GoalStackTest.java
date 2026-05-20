@@ -122,8 +122,8 @@ class GoalStackTest {
         stack.updateStatus("fetch-data", GoalStatus.COMPLETED);
         stack.updateStatus("validate",   GoalStatus.ACTIVE);
 
-        assertEquals(GoalStatus.ACTIVE, stack.currentActive().get().goalId().equals("validate")
-                ? GoalStatus.ACTIVE : GoalStatus.FAILED);
+        assertEquals("validate", stack.currentActive().get().goalId(),
+                "validate must be the current active goal");
 
         stack.updateStatus("validate", GoalStatus.COMPLETED);
         stack.updateStatus("mission",  GoalStatus.COMPLETED);
